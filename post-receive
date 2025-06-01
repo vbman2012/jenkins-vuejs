@@ -9,9 +9,9 @@
 LOG_FILE="/var/log/git-hooks.log"
 
 # Jenkins configuration
-JENKINS_URL="http://your-jenkins-server/job/jenkins-vuejs/build"
-JENKINS_USER="your-jenkins-user"
-JENKINS_API_TOKEN="your-jenkins-api-token"
+JENKINS_URL="http://localhost:8088/job/jenkins-vuejs/build"
+JENKINS_USER="alattar"
+JENKINS_API_TOKEN="11e25b0f1e9c5f8e342d3ed409bcf5c691"
 
 # Function to log messages
 log_message() {
