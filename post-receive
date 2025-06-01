@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# Git hook to track only main and dev branches
+# Automatically updates main when changes are pushed to dev
+# Triggers Jenkins builds for both main and dev branches
+# Place this file in .git/hooks/ directory on your Git server and make it executable
+
+# Log file for debugging
+LOG_FILE="/var/log/git-hooks.log"
+
+# Jenkins configuration
+JENKINS_URL="http://your-jenkins-server/job/jenkins-vuejs/build"
+JENKINS_USER="your-jenkins-user"
+JENKINS_API_TOKEN="your-jenkins-api-token"
+
+# Function to log messages
+log_message() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> $LOG_FILE
+}
+
+# Function to trigger Jenkins build
+trigger_jenkins() {
+    log_message "Triggering Jenkins build for branch: $1"
+    curl_result=$(curl -s -X POST "$JENKINS_URL" --user "$JENKINS_USER:$JENKINS_API_TOKEN" 2>&1)
+    log_message "Jenkins build triggered: $curl_result"
+}
+
+log_message "Post-receive hook triggered"
+
+# Get the name of the repository
+REPO_NAME=$(basename $(pwd) | sed 's/\.git$//')
+log_message "Repository: $REPO_NAME"
+
+# Read standard input to get the pushed refs
+while read oldrev newrev refname; do
+    branch=$(echo $refname | sed 's/^refs\/heads\///')
+    log_message "Push received: $branch $oldrev -> $newrev"
+    
+    # Only process main and dev branches
+    if [ "$branch" != "main" ] && [ "$branch" != "dev" ]; then
+        log_message "Branch $branch is not main or dev, ignoring"
+        continue
+    fi
+    
+    # Handle main branch push
+    if [ "$branch" = "main" ]; then
+        log_message "Push is to main branch, triggering Jenkins build"
+        trigger_jenkins "main"
+        continue
+    fi
+    
+    # Handle dev branch push - update main with changes from dev
+    if [ "$branch" = "dev" ]; then
+        log_message "Push is to dev branch, updating main"
+        
+        # Ensure we're in a clean state
+        git checkout -f main
+        
+        # Merge the changes from dev branch
+        log_message "Merging dev into main"
+        merge_result=$(git merge --no-ff $newrev -m "Auto-merge branch 'dev' into main" 2>&1)
+        merge_status=$?
+        
+        if [ $merge_status -eq 0 ]; then
+            log_message "Successfully merged dev into main"
+            
+            # Push the updated main branch
+            push_result=$(git push origin main 2>&1)
+            push_status=$?
+            
+            if [ $push_status -eq 0 ]; then
+                log_message "Successfully pushed updated main branch"
+                trigger_jenkins "main"
+            else
+                log_message "Failed to push main branch: $push_result"
+            fi
+        else
+            log_message "Failed to merge dev into main: $merge_result"
+            log_message "Manual intervention required to resolve conflicts"
+            
+            # Still trigger Jenkins for the dev branch
+            trigger_jenkins "dev"
+        fi
+    fi
+done
+
+log_message "Post-receive hook completed"
+exit 0
