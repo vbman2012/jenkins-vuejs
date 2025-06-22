@@ -39,3 +39,4 @@ npm run lint
 - `/src/views/`: Page components used by the router
 - `/src/router/`: Vue Router configuration
 - `/src/assets/`: Static assets like CSS and images
+update readme 1
